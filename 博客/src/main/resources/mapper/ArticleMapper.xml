@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.blog.mapper.ArticleMapper">
+
+    <resultMap id="articleMap" type="com.blog.entity.Article">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="summary" column="summary"/>
+        <result property="coverImage" column="cover_image"/>
+        <result property="userId" column="user_id"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="viewCount" column="view_count"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="status" column="status"/>
+        <result property="isTop" column="is_top"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="username" column="username"/>
+        <result property="categoryName" column="category_name"/>
+    </resultMap>
+
+    <sql id="articleColumns">
+        a.id, a.title, a.content, a.summary, a.cover_image, a.user_id,
+        a.category_id, a.view_count, a.comment_count, a.status, a.is_top,
+        a.created_at, a.updated_at
+    </sql>
+
+    <sql id="joinColumns">
+        , u.username, c.name AS category_name
+    </sql>
+
+    <sql id="fromJoin">
+        FROM article a
+        LEFT JOIN `user` u ON a.user_id = u.id
+        LEFT JOIN category c ON a.category_id = c.id
+    </sql>
+
+    <insert id="insert" parameterType="com.blog.entity.Article" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO article (title, content, summary, cover_image, user_id, category_id, status, is_top)
+        VALUES (#{title}, #{content}, #{summary}, #{coverImage}, #{userId}, #{categoryId}, #{status}, #{isTop})
+    </insert>
+
+    <update id="updateById" parameterType="com.blog.entity.Article">
+        UPDATE article
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="summary != null">summary = #{summary},</if>
+            <if test="coverImage != null">cover_image = #{coverImage},</if>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="isTop != null">is_top = #{isTop},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateViewCount">
+        UPDATE article SET view_count = #{count} WHERE id = #{id}
+    </update>
+
+    <update id="updateCommentCount">
+        UPDATE article SET comment_count = comment_count + #{delta} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM article WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="articleMap">
+        SELECT <include refid="articleColumns"/> <include refid="joinColumns"/>
+        <include refid="fromJoin"/>
+        WHERE a.id = #{id}
+    </select>
+
+    <select id="selectList" resultMap="articleMap">
+        SELECT <include refid="articleColumns"/> <include refid="joinColumns"/>
+        <include refid="fromJoin"/>
+        <where>
+            <if test="status != null and status != ''">
+                AND a.status = #{status}
+            </if>
+            <if test="categoryId != null">
+                AND a.category_id = #{categoryId}
+            </if>
+            <if test="tagId != null">
+                AND a.id IN (SELECT article_id FROM article_tag WHERE tag_id = #{tagId})
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.summary LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        <choose>
+            <when test="orderBy == 'hot'">ORDER BY a.is_top DESC, a.view_count DESC, a.created_at DESC</when>
+            <otherwise>ORDER BY a.is_top DESC, a.created_at DESC</otherwise>
+        </choose>
+    </select>
+
+    <select id="selectByUserId" resultMap="articleMap">
+        SELECT <include refid="articleColumns"/> <include refid="joinColumns"/>
+        <include refid="fromJoin"/>
+        WHERE a.user_id = #{userId}
+        ORDER BY a.created_at DESC
+    </select>
+
+    <select id="selectHot" resultMap="articleMap">
+        SELECT <include refid="articleColumns"/> <include refid="joinColumns"/>
+        <include refid="fromJoin"/>
+        WHERE a.status = 'PUBLISHED'
+        ORDER BY a.is_top DESC, a.view_count DESC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertArticleTags">
+        INSERT INTO article_tag (article_id, tag_id) VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{articleId}, #{tagId})
+        </foreach>
+    </insert>
+
+    <delete id="deleteArticleTags">
+        DELETE FROM article_tag WHERE article_id = #{articleId}
+    </delete>
+
+    <select id="selectTagIdsByArticleId" resultType="long">
+        SELECT tag_id FROM article_tag WHERE article_id = #{articleId}
+    </select>
+
+</mapper>
